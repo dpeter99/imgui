@@ -19,7 +19,8 @@
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
-//  2018-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2019-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2019-07-21: Inputs: Added mapping for ImGuiKey_KeyPadEnter.
 //  2019-04-23: Inputs: Added support for SDL_GameController (if ImGuiConfigFlags_NavEnableGamepad is set by user application).
 //  2019-03-12: Misc: Preserve DisplayFramebufferScale when main window is minimized.
 //  2018-12-21: Inputs: Workaround for Android/iOS which don't seem to handle focus related calls.
@@ -177,6 +178,7 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     io.KeyMap[ImGuiKey_Space] = SDL_SCANCODE_SPACE;
     io.KeyMap[ImGuiKey_Enter] = SDL_SCANCODE_RETURN;
     io.KeyMap[ImGuiKey_Escape] = SDL_SCANCODE_ESCAPE;
+    io.KeyMap[ImGuiKey_KeyPadEnter] = SDL_SCANCODE_RETURN2;
     io.KeyMap[ImGuiKey_A] = SDL_SCANCODE_A;
     io.KeyMap[ImGuiKey_C] = SDL_SCANCODE_C;
     io.KeyMap[ImGuiKey_V] = SDL_SCANCODE_V;
@@ -200,6 +202,12 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     // Our mouse update function expect PlatformHandle to be filled for the main viewport
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     main_viewport->PlatformHandle = (void*)window;
+#if defined(_WIN32)
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(window, &info))
+        main_viewport->PlatformHandleRaw = info.info.win.window;
+#endif
 
     // We need SDL_CaptureMouse(), SDL_GetGlobalMouseState() from SDL 2.0.4+ to support multiple viewports.
     // We left the call to ImGui_ImplSDL2_InitPlatformInterface() outside of #ifdef to avoid unused-function warnings.
@@ -218,6 +226,14 @@ bool ImGui_ImplSDL2_InitForOpenGL(SDL_Window* window, void* sdl_gl_context)
 bool ImGui_ImplSDL2_InitForVulkan(SDL_Window* window)
 {
 #if !SDL_HAS_VULKAN
+    IM_ASSERT(0 && "Unsupported");
+#endif
+    return ImGui_ImplSDL2_Init(window, NULL);
+}
+
+bool ImGui_ImplSDL2_InitForD3D(SDL_Window* window)
+{
+#if !defined(_WIN32)
     IM_ASSERT(0 && "Unsupported");
 #endif
     return ImGui_ImplSDL2_Init(window, NULL);
@@ -447,7 +463,14 @@ static void ImGui_ImplSDL2_CreateWindow(ImGuiViewport* viewport)
     }
     if (use_opengl && backup_context)
         SDL_GL_MakeCurrent(data->Window, backup_context);
+
     viewport->PlatformHandle = (void*)data->Window;
+#if defined(_WIN32)
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (SDL_GetWindowWMInfo(data->Window, &info))
+        viewport->PlatformHandleRaw = info.info.win.window;
+#endif
 }
 
 static void ImGui_ImplSDL2_DestroyWindow(ImGuiViewport* viewport)
@@ -469,28 +492,23 @@ static void ImGui_ImplSDL2_ShowWindow(ImGuiViewport* viewport)
 {
     ImGuiViewportDataSDL2* data = (ImGuiViewportDataSDL2*)viewport->PlatformUserData;
 #if defined(_WIN32)
-    SDL_SysWMinfo info;
-    SDL_VERSION(&info.version);
-    if (SDL_GetWindowWMInfo(data->Window, &info))
+    HWND hwnd = (HWND)viewport->PlatformHandleRaw;
+
+    // SDL hack: Hide icon from task bar
+    // Note: SDL 2.0.6+ has a SDL_WINDOW_SKIP_TASKBAR flag which is supported under Windows but the way it create the window breaks our seamless transition.
+    if (viewport->Flags & ImGuiViewportFlags_NoTaskBarIcon)
     {
-        HWND hwnd = info.info.win.window;
+        LONG ex_style = ::GetWindowLong(hwnd, GWL_EXSTYLE);
+        ex_style &= ~WS_EX_APPWINDOW;
+        ex_style |= WS_EX_TOOLWINDOW;
+        ::SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
+    }
 
-        // SDL hack: Hide icon from task bar
-        // Note: SDL 2.0.6+ has a SDL_WINDOW_SKIP_TASKBAR flag which is supported under Windows but the way it create the window breaks our seamless transition.
-        if (viewport->Flags & ImGuiViewportFlags_NoTaskBarIcon)
-        {
-            LONG ex_style = ::GetWindowLong(hwnd, GWL_EXSTYLE);
-            ex_style &= ~WS_EX_APPWINDOW;
-            ex_style |= WS_EX_TOOLWINDOW;
-            ::SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
-        }
-
-        // SDL hack: SDL always activate/focus windows :/
-        if (viewport->Flags & ImGuiViewportFlags_NoFocusOnAppearing)
-        {
-            ::ShowWindow(hwnd, SW_SHOWNA);
-            return;
-        }
+    // SDL hack: SDL always activate/focus windows :/
+    if (viewport->Flags & ImGuiViewportFlags_NoFocusOnAppearing)
+    {
+        ::ShowWindow(hwnd, SW_SHOWNA);
+        return;
     }
 #endif
 
