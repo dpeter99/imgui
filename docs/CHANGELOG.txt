@@ -144,6 +144,8 @@ Other Changes:
   we will rework the circle rendering functions to use textures and automatic segment count
   selection, those new api can fill a gap. [@ShironekoBen]
 - Misc: Added ImGuiMouseCursor_NotAllowed enum so it can be used by more shared widgets. [@rokups]
+- Misc: Disable format checks when using stb_printf, to allow using extra formats.
+  Made IMGUI_USE_STB_SPRINTF a properly documented imconfig.h flag. (#2954) [@loicmolinari]
 - Misc: Added misc/single_file/imgui_single_file.h, We use this to validate compiling all *.cpp
   files in a same compilation unit. Actual users of that technique (also called "Unity builds")
   can generally provide this themselves, so we don't really recommend you use this. [@rokups]
@@ -151,6 +153,10 @@ Other Changes:
 - Backends: GLFW: Added support for the missing mouse cursors newly added in GLFW 3.4+. [@rokups]
 - Backends: SDL: Wayland: use SDL_GetMouseState (because there is no global mouse state available
   on Wayland). (#2800, #2802) [@NeroBurner]
+- Backends: GLFW, SDL: report Windows key (io.KeySuper) as always released. Neither GLFW nor SDL can
+  correctly report the key release in every cases (e.g. when using Win+V) causing problems with some
+  widgets. The next release of GLFW (3.4+) will have a fix for it. However since it is both difficult
+  and discouraged to make use of this key for Windows application anyway, we just hide it. (#2976)
 - Backends: Win32: Added support for #define IMGUI_IMPL_WIN32_DISABLE_GAMEPAD to disable all
   XInput using code, and IMGUI_IMPL_WIN32_DISABLE_LINKING_XINPUT to disable linking with XInput,
   the later may be problematic if compiling with recent Windows SDK and you want your app to run

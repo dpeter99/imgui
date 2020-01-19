@@ -824,6 +824,9 @@ CODE
 #ifdef _MSC_VER
 #pragma warning (disable: 4127)     // condition expression is constant
 #pragma warning (disable: 4996)     // 'This function or variable may be unsafe': strcpy, strdup, sprintf, vsnprintf, sscanf, fopen
+#if defined(_MSC_VER) && _MSC_VER >= 1922 // MSVC 2019 16.2 or later
+#pragma warning (disable: 5054)     // operator '|': deprecated between enumerations of different types
+#endif
 #endif
 
 // Clang/GCC warnings with -Weverything
@@ -1392,7 +1395,6 @@ const char* ImStrSkipBlank(const char* str)
 // You may set IMGUI_USE_STB_SPRINTF to use our default wrapper, or set IMGUI_DISABLE_DEFAULT_FORMAT_FUNCTIONS
 // and setup the wrapper yourself. (FIXME-OPT: Some of our high-level operations such as ImGuiTextBuffer::appendfv() are
 // designed using two-passes worst case, which probably could be improved using the stbsp_vsprintfcb() function.)
-//#define IMGUI_USE_STB_SPRINTF
 #ifdef IMGUI_USE_STB_SPRINTF
 #define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"
@@ -2805,7 +2807,7 @@ void ImGui::GcAwakeTransientWindowBuffers(ImGuiWindow* window)
 }
 
 // FIXME-NAV: Refactor those functions into a single, more explicit one.
-void ImGui::SetNavID(ImGuiID id, int nav_layer, int focus_scope_id)
+void ImGui::SetNavID(ImGuiID id, int nav_layer, ImGuiID focus_scope_id)
 {
     ImGuiContext& g = *GImGui;
     IM_ASSERT(g.NavWindow);
@@ -2815,7 +2817,7 @@ void ImGui::SetNavID(ImGuiID id, int nav_layer, int focus_scope_id)
     g.NavWindow->NavLastIds[nav_layer] = id;
 }
 
-void ImGui::SetNavIDWithRectRel(ImGuiID id, int nav_layer, int focus_scope_id, const ImRect& rect_rel)
+void ImGui::SetNavIDWithRectRel(ImGuiID id, int nav_layer, ImGuiID focus_scope_id, const ImRect& rect_rel)
 {
     ImGuiContext& g = *GImGui;
     SetNavID(id, nav_layer, focus_scope_id);
@@ -3015,10 +3017,10 @@ bool ImGui::ItemAdd(const ImRect& bb, ImGuiID id, const ImRect* nav_bb_arg)
 
         // [DEBUG] Item Picker tool, when enabling the "extended" version we perform the check in ItemAdd()
 #ifdef IMGUI_DEBUG_TOOL_ITEM_PICKER_EX
-        if (id == g.DebugItemPickerBreakID)
+        if (id == g.DebugItemPickerBreakId)
         {
             IM_DEBUG_BREAK();
-            g.DebugItemPickerBreakID = 0;
+            g.DebugItemPickerBreakId = 0;
         }
 #endif
     }
@@ -3117,7 +3119,7 @@ bool ImGui::ItemHoverable(const ImRect& bb, ImGuiID id)
     // #define IMGUI_DEBUG_TOOL_ITEM_PICKER_EX in imconfig.h if you want this check to also be performed in ItemAdd().
     if (g.DebugItemPickerActive && g.HoveredIdPreviousFrame == id)
         GetForegroundDrawList()->AddRect(bb.Min, bb.Max, IM_COL32(255, 255, 0, 255));
-    if (g.DebugItemPickerBreakID == id)
+    if (g.DebugItemPickerBreakId == id)
         IM_DEBUG_BREAK();
 
     return true;
@@ -4071,7 +4073,7 @@ void ImGui::NewFrame()
 void ImGui::UpdateDebugToolItemPicker()
 {
     ImGuiContext& g = *GImGui;
-    g.DebugItemPickerBreakID = 0;
+    g.DebugItemPickerBreakId = 0;
     if (g.DebugItemPickerActive)
     {
         const ImGuiID hovered_id = g.HoveredIdPreviousFrame;
@@ -4080,7 +4082,7 @@ void ImGui::UpdateDebugToolItemPicker()
             g.DebugItemPickerActive = false;
         if (ImGui::IsMouseClicked(0) && hovered_id)
         {
-            g.DebugItemPickerBreakID = hovered_id;
+            g.DebugItemPickerBreakId = hovered_id;
             g.DebugItemPickerActive = false;
         }
         ImGui::SetNextWindowBgAlpha(0.60f);
@@ -7642,6 +7644,22 @@ void ImGui::ActivateItem(ImGuiID id)
 {
     ImGuiContext& g = *GImGui;
     g.NavNextActivateId = id;
+}
+
+void ImGui::PushFocusScope(ImGuiID id)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    window->IDStack.push_back(window->DC.NavFocusScopeIdCurrent);
+    window->DC.NavFocusScopeIdCurrent = id;
+}
+
+void ImGui::PopFocusScope()
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    window->DC.NavFocusScopeIdCurrent = window->IDStack.back();
+    window->IDStack.pop_back();
 }
 
 void ImGui::SetKeyboardFocusHere(int offset)

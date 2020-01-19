@@ -79,7 +79,7 @@ Index of this file:
 #include <assert.h>
 #define IM_ASSERT(_EXPR)            assert(_EXPR)                               // You can override the default assert handler by editing imconfig.h
 #endif
-#if defined(__clang__) || defined(__GNUC__)
+#if !defined(IMGUI_USE_STB_SPRINTF) && (defined(__clang__) || defined(__GNUC__))
 #define IM_FMTARGS(FMT)             __attribute__((format(printf, FMT, FMT+1))) // To apply printf-style warnings to our functions.
 #define IM_FMTLIST(FMT)             __attribute__((format(printf, FMT, 0)))
 #else
@@ -2330,10 +2330,10 @@ struct ImFont
     short                       ConfigDataCount;    // 2     // in  // ~ 1        // Number of ImFontConfig involved in creating this font. Bigger than 1 when merging multiple font sources into one ImFont.
     ImWchar                     FallbackChar;       // 2     // in  // = '?'      // Replacement character if a glyph isn't found. Only set via SetFallbackChar()
     ImWchar                     EllipsisChar;       // 2     // out // = -1       // Character used for ellipsis rendering.
+    bool                        DirtyLookupTables;  // 1     // out //
     float                       Scale;              // 4     // in  // = 1.f      // Base font scale, multiplied by the per-window font scale which you can adjust with SetWindowFontScale()
     float                       Ascent, Descent;    // 4+4   // out //            // Ascent: distance from top to bottom of e.g. 'A' [0..FontSize]
     int                         MetricsTotalSurface;// 4     // out //            // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
-    bool                        DirtyLookupTables;  // 1     // out //
 
     // Methods
     IMGUI_API ImFont();
